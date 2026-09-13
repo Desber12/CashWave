@@ -12,13 +12,25 @@
         integrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9YAA1QvwINks4PhcElQSvqcyVLLD9aMhXd13uQjoXtEKNosOWaZqXgel0g=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
 
+    <!-- Global Modern Polish untuk Stisla -->
+    <style>
+        body {
+            background-color: #f4f6f9 !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-sidebar {
+            box-shadow: 0 4px 25px 0 rgba(0, 0, 0, 0.05);
+        }
+        .navbar {
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.04);
+        }
+    </style>
+
     @stack('style')
 
     <!-- Template CSS -->
     <link rel="stylesheet" href="{{ asset('css/style.css') }}">
     <link rel="stylesheet" href="{{ asset('css/components.css') }}">
-
-</head>
 </head>
 
 <body>
@@ -45,7 +57,7 @@
     <script src="{{ asset('library/bootstrap/dist/js/bootstrap.min.js') }}"></script>
     <script src="{{ asset('library/jquery.nicescroll/dist/jquery.nicescroll.min.js') }}"></script>
     <script src="{{ asset('library/moment/min/moment.min.js') }}"></script>
-    <script src="{{ asset('js/stisla.js') }}"></script>
+    <script src="{{ asset('js/stisla.js') }}></script>
 
     @stack('scripts')
 
