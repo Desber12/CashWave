@@ -5,43 +5,54 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Product;
+use App\Models\Category;
 
 class ProductController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Get all products
      */
-    public function index()
+    public function index(Request $request)
     {
-        $payload = request()->all();
+        $products = Product::query();
 
-        $products = new \App\Models\Product;
-
-        if(!empty($payload['name'])){
-            $products = $products->where('name','LIKE','%'.$payload['name'].'%');
+        // Search berdasarkan nama produk
+        if ($request->filled('name')) {
+            $products->where(
+                'name',
+                'LIKE',
+                '%' . $request->name . '%'
+            );
         }
 
-        if(!empty($payload['category_id'])){
-            $products = $products->where('category_id', $payload['category_id']);
+        // Filter berdasarkan category_id
+        if ($request->filled('category_id')) {
+            $products->where(
+                'category_id',
+                $request->category_id
+            );
         }
-                                
-        if(!empty($payload['order_sort']) && !empty($payload['order_by'])){
-            $products = $products->orderBy($payload['order_by'], $payload['order_sort']);   
+
+        // Sorting
+        if ($request->filled('order_sort') && $request->filled('order_by')) {
+            $products->orderBy(
+                $request->order_by,
+                $request->order_sort
+            );
         }
 
-        $products = $products->paginate((!empty($payload['per_page'])) ? $payload['per_page'] : 10);
+        // Ambil semua products
+        $products = $products->get();
 
-
-        //all products
         return response()->json([
             'success' => true,
             'message' => 'List Data Product',
-            'data' => $products
+            'data' => $products,
         ], 200);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store new product
      */
     public function store(Request $request)
     {
@@ -49,88 +60,187 @@ class ProductController extends Controller
             'name' => 'required|min:3',
             'price' => 'required|integer',
             'stock' => 'required|integer',
-            'category_id' => 'required',
-            'image' => 'required|image|mimes:png,jpg,jpeg'
+            'category_id' => 'required|exists:categories,id',
+            'image' => 'nullable|image|mimes:png,jpg,jpeg',
+            'is_favorite' => 'nullable',
         ]);
 
-        $filename = time() . '.' . $request->image->extension();
-        $request->image->storeAs('public/product', $filename);
-        $category = \App\Models\Category::where('id', $request->category_id)->first();
-        $product = \App\Models\Product::create([
+        // Cari category
+        $category = Category::find($request->category_id);
+
+        // Upload image jika ada
+        $filename = null;
+
+        if ($request->hasFile('image')) {
+            $filename = time() . '.' . $request->image->extension();
+
+            $request->image->storeAs(
+                'public/product',
+                $filename
+            );
+        }
+
+        // Create product
+        $product = Product::create([
             'name' => $request->name,
             'price' => (int) $request->price,
             'stock' => (int) $request->stock,
             'category_id' => $request->category_id,
-            'category' => $category->name,
+            'category' => $category ? $category->name : null,
             'image' => $filename,
-            'is_favorite' => $request->is_favorite
+            'is_favorite' => $request->is_favorite ?? 0,
         ]);
 
-        if ($product) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Product Created',
-                'data' => $product
-            ], 201);
-        } else {
-            return response()->json([
-                'success' => false,
-                'message' => 'Product Failed to Save',
-            ], 409);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Product Created',
+            'data' => $product,
+        ], 201);
     }
 
     /**
-     * Display the specified resource.
+     * Get product detail
      */
     public function show(string $id)
     {
-    $product = \App\Models\Product::find($id);
+        $product = Product::find($id);
 
-    if ($product) {
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product Not Found',
+                'data' => null,
+            ], 404);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Detail Product',
-            'data' => $product
+            'data' => $product,
         ], 200);
-    } else {
-        return response()->json([
-            'success' => false,
-            'message' => 'Product Not Found',
-        ], 404);
-    }
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update product
      */
     public function update(Request $request, string $id)
     {
-        //
+        $product = Product::find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product Not Found',
+            ], 404);
+        }
+
+        $request->validate([
+            'name' => 'sometimes|required|min:3',
+            'price' => 'sometimes|required|integer',
+            'stock' => 'sometimes|required|integer',
+            'category_id' => 'sometimes|required|exists:categories,id',
+            'image' => 'nullable|image|mimes:png,jpg,jpeg',
+            'is_favorite' => 'nullable',
+        ]);
+
+        if ($request->filled('name')) {
+            $product->name = $request->name;
+        }
+
+        if ($request->filled('price')) {
+            $product->price = (int) $request->price;
+        }
+
+        if ($request->filled('stock')) {
+            $product->stock = (int) $request->stock;
+        }
+
+        if ($request->filled('category_id')) {
+            $category = Category::find($request->category_id);
+
+            $product->category_id = $request->category_id;
+            $product->category = $category
+                ? $category->name
+                : null;
+        }
+
+        if ($request->hasFile('image')) {
+            $filename = time() . '.' . $request->image->extension();
+
+            $request->image->storeAs(
+                'public/product',
+                $filename
+            );
+
+            $product->image = $filename;
+        }
+
+        if ($request->has('is_favorite')) {
+            $product->is_favorite = $request->is_favorite;
+        }
+
+        $product->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product Updated',
+            'data' => $product,
+        ], 200);
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Delete product
      */
     public function destroy(string $id)
     {
-        //
+        $product = Product::find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product Not Found',
+            ], 404);
+        }
+
+        $product->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Product Deleted',
+        ], 200);
     }
 
+    /**
+     * Get products by category
+     */
     public function getByCategory($category)
     {
-    $products = Product::where('category', $category)->get();
+        $products = Product::where(
+            'category',
+            $category
+        )->get();
 
-    if ($products->isEmpty()) {
         return response()->json([
-            'message' => 'No products found in this category.',
-            'data' => []
-        ], 404);
+            'success' => true,
+            'message' => 'Products retrieved successfully.',
+            'data' => $products,
+        ], 200);
     }
 
-    return response()->json([
-        'message' => 'Products retrieved successfully.',
-        'data' => $products
-    ], 200);
+    /**
+     * Get products by category ID
+     */
+    public function filterByCategory($id)
+    {
+        $products = Product::where(
+            'category_id',
+            $id
+        )->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Products retrieved successfully.',
+            'data' => $products,
+        ], 200);
     }
 }
